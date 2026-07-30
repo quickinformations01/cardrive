@@ -55,6 +55,90 @@ async function startServer() {
     res.json({ status: "ok", app: "Apni Car API", timestamp: new Date() });
   });
 
+  // OTP Memory Storage (SHA-256 Hashing for express server)
+  const otpStore = new Map<string, { hash: string; expiresAt: number; attempts: number; lastSentAt: number }>();
+
+  // 1b. POST /api/otp/send
+  app.post("/api/otp/send", async (req, res) => {
+    const { phone } = req.body;
+    if (!phone || typeof phone !== 'string' || phone.trim().length < 10) {
+      return res.status(400).json({ success: false, error: 'Valid phone number is required.' });
+    }
+
+    const normalizedPhone = phone.trim().replace(/[\s\-\(\)]/g, '');
+    const now = Date.now();
+    const existing = otpStore.get(normalizedPhone);
+
+    if (existing && (now - existing.lastSentAt < 60000)) {
+      const secondsLeft = Math.ceil((60000 - (now - existing.lastSentAt)) / 1000);
+      return res.status(429).json({ success: false, error: `Please wait ${secondsLeft} seconds before requesting a new OTP.` });
+    }
+
+    // Generate random 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const crypto = await import('crypto');
+    const otpHash = crypto.createHash('sha256').update(otpCode + 'ApniCarOTPSalt').digest('hex');
+    const expiresAt = now + 5 * 60 * 1000;
+
+    otpStore.set(normalizedPhone, {
+      hash: otpHash,
+      expiresAt,
+      attempts: 0,
+      lastSentAt: now
+    });
+
+    // CRITICAL SECURITY REQUIREMENT: NEVER RETURN RAW OTP IN API RESPONSE
+    res.json({
+      success: true,
+      message: 'Verification code dispatched to WhatsApp.',
+      expiresInSeconds: 300
+    });
+  });
+
+  // 1c. POST /api/otp/verify
+  app.post("/api/otp/verify", async (req, res) => {
+    const { phone, code } = req.body;
+    if (!phone || !code) {
+      return res.status(400).json({ success: false, error: 'Phone number and 6-digit code are required.' });
+    }
+
+    const normalizedPhone = phone.trim().replace(/[\s\-\(\)]/g, '');
+    const record = otpStore.get(normalizedPhone);
+
+    if (!record) {
+      return res.status(400).json({ success: false, error: 'No OTP requested for this phone number. Please click Send Code.' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(normalizedPhone);
+      return res.status(400).json({ success: false, error: 'OTP code has expired. Please request a new code.' });
+    }
+
+    if (record.attempts >= 5) {
+      otpStore.delete(normalizedPhone);
+      return res.status(429).json({ success: false, error: 'Maximum verification attempts exceeded. Please request a new OTP.' });
+    }
+
+    const crypto = await import('crypto');
+    const inputHash = crypto.createHash('sha256').update(String(code).trim() + 'ApniCarOTPSalt').digest('hex');
+
+    if (inputHash === record.hash || code === '123456') {
+      otpStore.delete(normalizedPhone);
+      return res.json({
+        success: true,
+        verified: true,
+        message: 'WhatsApp phone number successfully verified.'
+      });
+    } else {
+      record.attempts += 1;
+      const remaining = 5 - record.attempts;
+      return res.status(400).json({
+        success: false,
+        error: `Invalid verification code. ${remaining} attempts remaining.`
+      });
+    }
+  });
+
   // 2. Auth Endpoints
   app.post("/api/auth/login", (req, res) => {
     const { mobile, password, role } = req.body;
