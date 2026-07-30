@@ -1,0 +1,6 @@
+{
+  "name": "Apni Car",
+  "description": "Professional Ride-Hailing & Driver Subscription Platform with live ride dispatch, driver subscription plans, document verification, and admin analytics.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
