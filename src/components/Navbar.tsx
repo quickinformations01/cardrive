@@ -182,16 +182,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="hidden sm:inline">WhatsApp / Google</span> Signup
           </button>
 
-          {/* Become a Driver Button for Riders */}
-          {currentRole === 'rider' && (
-            <button
-              onClick={onOpenRegisterDriverModal}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md shadow-emerald-950/50 hover:brightness-110 transition"
-            >
-              <PlusCircle className="w-4 h-4" />
-              Register as Driver
-            </button>
-          )}
+          {/* Register as Driver Button */}
+          <button
+            onClick={onOpenRegisterDriverModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md shadow-emerald-950/50 hover:brightness-110 transition active:scale-95 shrink-0"
+            title="Register as Driver"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Register Driver</span>
+          </button>
 
           {/* Subscription Badge for Drivers */}
           {currentRole === 'driver' && currentDriver && (

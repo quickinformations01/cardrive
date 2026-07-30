@@ -26,7 +26,8 @@ import {
   INITIAL_RIDERS, 
   INITIAL_SUBSCRIPTIONS, 
   INITIAL_TRIPS, 
-  INITIAL_NOTIFICATIONS 
+  INITIAL_NOTIFICATIONS,
+  calculateFare
 } from './services/store';
 
 export default function App() {
@@ -177,7 +178,9 @@ export default function App() {
     pickupAddress: string;
     destAddress: string;
     distanceKm: number;
+    estimatedFarePKR?: number;
   }) => {
+    const calculatedFare = data.estimatedFarePKR || calculateFare(data.vehicleType, data.distanceKm, 350);
     const newTrip: TripRequest = {
       id: `trip_${Date.now()}`,
       riderId: currentRider.id,
@@ -190,7 +193,7 @@ export default function App() {
       destLat: dropoffLocation?.lat || 31.4822,
       destLng: dropoffLocation?.lng || 74.3642,
       distanceKm: data.distanceKm,
-      estimatedFarePKR: Math.ceil(100 + data.distanceKm * 55),
+      estimatedFarePKR: calculatedFare,
       vehicleType: data.vehicleType,
       status: 'requested',
       paymentMethod: 'cash',
@@ -437,21 +440,8 @@ export default function App() {
         ) : (
           /* Main Interactive Map & Role Panel Split Grid */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Interactive Map (7 Cols) */}
-            <div className="lg:col-span-7 h-[420px] sm:h-[540px] lg:h-[680px] sticky top-20">
-              <InteractiveMap
-                pickupLocation={pickupLocation}
-                dropoffLocation={dropoffLocation}
-                drivers={drivers}
-                onMapClick={(lat, lng) => {
-                  setDropoffLocation({ lat, lng, address: `Custom Pin (${lat.toFixed(3)}, ${lng.toFixed(3)})` });
-                }}
-                activeTripDriverLocation={activeTrip && activeTrip.status !== 'completed' ? { lat: currentDriver.lat, lng: currentDriver.lng } : null}
-              />
-            </div>
-
-            {/* Right Role-Based Control Dashboard (5 Cols) */}
-            <div className="lg:col-span-5 space-y-6">
+            {/* Booking / Role-Based Control Panel (5 Cols - Order 1 on mobile) */}
+            <div className="lg:col-span-5 order-1 lg:order-1 space-y-6">
               {currentRole === 'rider' ? (
                 <RiderDashboard
                   pickup={pickupLocation}
@@ -465,6 +455,7 @@ export default function App() {
                     alert(`Thank you for rating ${rating} stars! Review saved.`);
                   }}
                   onlineDriversCount={onlineDriversCount}
+                  onOpenRegisterDriverModal={() => setIsRegisterDriverModalOpen(true)}
                 />
               ) : (
                 <DriverDashboard
@@ -477,6 +468,19 @@ export default function App() {
                   pendingTripsCount={trips.filter(t => t.status === 'requested').length}
                 />
               )}
+            </div>
+
+            {/* Interactive Map (7 Cols - Order 2 on mobile) */}
+            <div className="lg:col-span-7 order-2 lg:order-2 h-[380px] sm:h-[500px] lg:h-[680px] lg:sticky lg:top-20 z-0">
+              <InteractiveMap
+                pickupLocation={pickupLocation}
+                dropoffLocation={dropoffLocation}
+                drivers={drivers}
+                onMapClick={(lat, lng) => {
+                  setDropoffLocation({ lat, lng, address: `Custom Pin (${lat.toFixed(3)}, ${lng.toFixed(3)})` });
+                }}
+                activeTripDriverLocation={activeTrip && activeTrip.status !== 'completed' ? { lat: currentDriver.lat, lng: currentDriver.lng } : null}
+              />
             </div>
           </div>
         )}
