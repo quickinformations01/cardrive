@@ -109,12 +109,24 @@ export default function App() {
       setRiders([newRider, ...riders]);
       setCurrentRiderIndex(0);
 
-      // Register Rider to backend
+      // Register Rider to backend & Cloudflare D1
       fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile, fullName, role: 'rider' })
       }).catch(() => {});
+
+      fetch('https://apnicar-backend.quickinformations01.workers.dev/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: fullName || 'Valued Passenger',
+          phone: mobile,
+          password: 'RiderPassword123',
+          role: 'passenger',
+          city: 'Lahore'
+        })
+      }).catch(err => console.warn('Cloudflare Worker sync note:', err));
     } else {
       setIsRegisterDriverModalOpen(true);
     }
@@ -415,6 +427,23 @@ export default function App() {
           licenceImage: newDriver.licenceImage,
           vehicleImage: newDriver.vehicleFrontUrl,
           city: newDriver.city
+        })
+      });
+
+      // Also sync to Cloudflare Worker D1 database API
+      await fetch('https://apnicar-backend.quickinformations01.workers.dev/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: newDriver.fullName,
+          phone: newDriver.mobile,
+          password: newDriver.cnic || 'DriverPassword123',
+          role: 'driver',
+          email: newDriver.email,
+          city: newDriver.city,
+          cnic: newDriver.cnic,
+          vehicleType: newDriver.vehicle.type,
+          regNumber: newDriver.vehicle.regNumber
         })
       });
     } catch (e) {

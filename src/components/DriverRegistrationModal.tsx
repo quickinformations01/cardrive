@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, CheckCircle2, Upload, Car, ChevronRight, ChevronLeft, ShieldAlert, FileText, Check } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, CheckCircle2, Upload, Car, ChevronRight, ChevronLeft, ShieldAlert, FileText, Check, Trash2, ExternalLink, Copy, MessageSquare } from 'lucide-react';
 import { DriverRegistrationData, VehicleType, Driver } from '../types';
 
 interface DriverRegistrationModalProps {
@@ -14,6 +14,9 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
   onSubmitDriver
 }) => {
   const [step, setStep] = useState<number>(1);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeUploadField, setActiveUploadField] = useState<keyof DriverRegistrationData | null>(null);
+
   const [formData, setFormData] = useState<DriverRegistrationData>({
     fullName: '',
     fatherName: '',
@@ -21,7 +24,7 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
     dob: '',
     gender: 'Male',
     mobile: '',
-    whatsappCode: '123456',
+    whatsappCode: '',
     isWhatsappVerified: false,
     vehicleType: 'mini',
     company: '',
@@ -48,16 +51,67 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
   });
 
   const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('123456');
+  const [generatedOtp, setGeneratedOtp] = useState('123456');
+  const [otpCode, setOtpCode] = useState('');
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
-  // Mock document uploader helper
-  const handleFileUpload = (field: keyof DriverRegistrationData) => {
-    // Generate a clean placeholder image URL representing the uploaded document
-    const mockUrl = `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=500&auto=format&fit=crop&q=80`;
-    setFormData((prev) => ({ ...prev, [field]: mockUrl }));
+  // Real document uploader triggering native file picker
+  const triggerFileUpload = (field: keyof DriverRegistrationData) => {
+    setActiveUploadField(field);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeUploadField) {
+      if (file.size > 10 * 1024 * 1024) {
+        setError('File size too large. Please upload an image under 10MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result && activeUploadField) {
+          setFormData((prev) => ({
+            ...prev,
+            [activeUploadField]: event.target?.result as string
+          }));
+          setError('');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveFile = (field: keyof DriverRegistrationData, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormData((prev) => ({ ...prev, [field]: '' }));
+  };
+
+  const handleSendWhatsappOtp = () => {
+    const cleanNum = formData.mobile.replace(/\s+/g, '');
+    if (cleanNum.length < 10) {
+      setError('Please enter a valid mobile number (e.g., 03001234567).');
+      return;
+    }
+    setError('');
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setOtpSent(true);
+  };
+
+  const handleOpenWhatsApp = () => {
+    let cleanNum = formData.mobile.replace(/[^0-9]/g, '');
+    if (cleanNum.startsWith('03')) {
+      cleanNum = '92' + cleanNum.substring(1);
+    }
+    const text = encodeURIComponent(`ApniCar Verification Code for ${formData.fullName || 'Driver'}: ${generatedOtp}`);
+    window.open(`https://api.whatsapp.com/send?phone=${cleanNum}&text=${text}`, '_blank');
   };
 
   const handleNext = () => {
@@ -185,6 +239,15 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
           ))}
         </div>
 
+        {/* Hidden File Input for Document & Photo Uploads */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          onChange={handleFileSelected}
+          className="hidden"
+        />
+
         {error && (
           <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400 font-medium text-center">
             {error}
@@ -264,7 +327,7 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
             {!formData.isWhatsappVerified ? (
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-300 mb-1 block">Mobile Number (WhatsApp)</label>
+                  <label className="text-xs font-semibold text-slate-300 mb-1 block">WhatsApp Mobile Number *</label>
                   <input
                     type="tel"
                     value={formData.mobile}
@@ -277,40 +340,55 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
                 {!otpSent ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (formData.mobile.length >= 10) {
-                        setOtpSent(true);
-                      } else {
-                        setError('Enter a valid mobile number.');
-                      }
-                    }}
-                    className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase"
+                    onClick={handleSendWhatsappOtp}
+                    className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase flex items-center justify-center gap-2"
                   >
-                    Send WhatsApp OTP
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Generate WhatsApp Code</span>
                   </button>
                 ) : (
                   <div className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <p className="text-xs text-slate-300 text-center">Enter 6-digit WhatsApp code (Default: 123456)</p>
-                    <input
-                      type="text"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 text-center text-lg font-bold font-mono text-emerald-400 focus:outline-none"
-                    />
+                    <div className="p-3 bg-emerald-950/50 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">WhatsApp Code</span>
+                        <span className="text-xl font-black text-emerald-400 font-mono tracking-widest">{generatedOtp}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleOpenWhatsApp}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-xs font-bold flex items-center gap-1 transition"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Send to WhatsApp</span>
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-300 mb-1 block">Enter 6-Digit WhatsApp Code</label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        placeholder={generatedOtp}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2.5 text-center text-lg font-bold font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => {
-                        if (otpCode === '123456') {
+                        if (otpCode.trim() === generatedOtp || otpCode.trim() === '123456') {
                           setFormData({ ...formData, isWhatsappVerified: true });
                           setError('');
                         } else {
-                          setError('Invalid Code. Use 123456');
+                          setError(`Invalid Code. Please enter ${generatedOtp} (or 123456)`);
                         }
                       }}
                       className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase flex items-center justify-center gap-1.5"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Verify WhatsApp Code</span>
+                      <span>Verify & Confirm Number</span>
                     </button>
                   </div>
                 )}
@@ -434,43 +512,69 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
         {/* Step 5: Document Uploads */}
         {step === 5 && (
           <div className="space-y-4">
-            <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">Step 5: Document Uploads</h3>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <h3 className="text-sm font-bold text-white">Step 5: Document Scan Copies</h3>
+              <span className="text-[11px] text-emerald-400 font-medium">Click any box to upload scan copy / photo</span>
+            </div>
             
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
               {[
-                { field: 'cnicFrontUrl', label: 'CNIC Front' },
-                { field: 'cnicBackUrl', label: 'CNIC Back' },
+                { field: 'cnicFrontUrl', label: 'CNIC Front Copy' },
+                { field: 'cnicBackUrl', label: 'CNIC Back Copy' },
                 { field: 'drivingLicenseUrl', label: 'Driving License' },
-                { field: 'registrationBookUrl', label: 'Reg. Book' },
-                { field: 'insuranceUrl', label: 'Insurance' },
-                { field: 'driverPhotoUrl', label: 'Driver Photo' },
-                { field: 'vehicleFrontUrl', label: 'Vehicle Front' },
-                { field: 'vehicleBackUrl', label: 'Vehicle Back' },
-                { field: 'vehicleLeftUrl', label: 'Vehicle Left' },
-                { field: 'vehicleRightUrl', label: 'Vehicle Right' },
+                { field: 'registrationBookUrl', label: 'Registration Book' },
+                { field: 'insuranceUrl', label: 'Insurance (Optional)' },
+                { field: 'driverPhotoUrl', label: 'Driver Selfie / Photo' },
+                { field: 'vehicleFrontUrl', label: 'Vehicle Front View' },
+                { field: 'vehicleBackUrl', label: 'Vehicle Rear View' },
+                { field: 'vehicleLeftUrl', label: 'Vehicle Left Side' },
+                { field: 'vehicleRightUrl', label: 'Vehicle Right Side' },
                 { field: 'vehicleInteriorUrl', label: 'Vehicle Interior' }
               ].map((doc) => {
                 const key = doc.field as keyof DriverRegistrationData;
-                const isUploaded = !!formData[key];
+                const fileVal = formData[key] as string;
+                const isUploaded = !!fileVal;
 
                 return (
                   <div
                     key={doc.field}
-                    onClick={() => handleFileUpload(key)}
-                    className={`p-3 rounded-xl border text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 ${
+                    onClick={() => triggerFileUpload(key)}
+                    className={`p-2.5 rounded-2xl border text-center cursor-pointer transition flex flex-col items-center justify-between min-h-[110px] relative group overflow-hidden ${
                       isUploaded
-                        ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
-                        : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-500'
+                        ? 'bg-emerald-950/30 border-emerald-500/60 text-emerald-200'
+                        : 'bg-slate-800/80 border-slate-700/80 text-slate-400 hover:border-emerald-500/50 hover:bg-slate-800'
                     }`}
                   >
                     {isUploaded ? (
-                      <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Uploaded
-                      </span>
+                      <div className="w-full space-y-1.5 flex flex-col items-center">
+                        <div className="relative w-full h-16 rounded-xl overflow-hidden border border-emerald-500/40 bg-slate-950">
+                          <img
+                            src={fileVal}
+                            alt={doc.label}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoveFile(key, e)}
+                            className="absolute top-1 right-1 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full shadow-md transition"
+                            title="Remove file"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Uploaded
+                        </span>
+                      </div>
                     ) : (
-                      <Upload className="w-5 h-5 text-slate-400" />
+                      <div className="my-auto flex flex-col items-center gap-1.5">
+                        <div className="w-9 h-9 rounded-full bg-slate-700/60 border border-slate-600 flex items-center justify-center text-slate-300 group-hover:text-emerald-400 group-hover:border-emerald-500/50 transition">
+                          <Upload className="w-4 h-4" />
+                        </div>
+                        <span className="text-[10px] text-slate-400 group-hover:text-slate-200 font-medium">Click to Upload</span>
+                      </div>
                     )}
-                    <span className="text-[11px] font-bold line-clamp-1">{doc.label}</span>
+                    <span className="text-[11px] font-bold line-clamp-1 mt-1">{doc.label}</span>
                   </div>
                 );
               })}

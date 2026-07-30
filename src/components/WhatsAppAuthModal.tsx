@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, Phone, ShieldCheck, MessageSquare, ArrowRight } from 'lucide-react';
+import { X, CheckCircle2, Phone, MessageSquare, ArrowRight, ExternalLink, Copy, Check } from 'lucide-react';
 
 interface WhatsAppAuthModalProps {
   isOpen: boolean;
@@ -18,6 +18,8 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
   const [mobile, setMobile] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -29,28 +31,67 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
       setError('Please enter your full name.');
       return;
     }
-    if (mobile.length < 10) {
-      setError('Please enter a valid Pakistani mobile number (e.g., 03001234567).');
+    const cleanNum = mobile.trim().replace(/\s+/g, '');
+    if (cleanNum.length < 10) {
+      setError('Please enter a valid mobile number (e.g., 03001234567 or +923001234567).');
       return;
     }
     setError('');
+
+    // Generate random 6-digit WhatsApp OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
     setOtpSent(true);
-    setOtpCode('123456'); // Auto-populate default WhatsApp OTP code
+    setOtpCode(''); // Let user enter or paste code
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleOpenWhatsApp = () => {
+    let cleanNum = mobile.replace(/[^0-9]/g, '');
+    if (cleanNum.startsWith('03')) {
+      cleanNum = '92' + cleanNum.substring(1);
+    }
+    const text = encodeURIComponent(`ApniCar Verification Code for ${fullName}: ${generatedOtp}. Enter this code in ApniCar app.`);
+    window.open(`https://api.whatsapp.com/send?phone=${cleanNum}&text=${text}`, '_blank');
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(generatedOtp);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpCode.trim() !== '123456') {
-      setError('Invalid WhatsApp OTP Code. Enter 123456');
+    if (otpCode.trim() !== generatedOtp && otpCode.trim() !== '123456') {
+      setError(`Invalid OTP Code. Please enter ${generatedOtp} (or 123456).`);
       return;
     }
 
     setIsVerifying(true);
+    setError('');
+
+    // Register user to Cloudflare D1 Worker API asynchronously
+    try {
+      await fetch('https://apnicar-backend.quickinformations01.workers.dev/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          phone: mobile.trim(),
+          password: 'UserSecretPassword123',
+          role: role === 'driver' ? 'driver' : 'passenger',
+          city: 'Lahore'
+        })
+      });
+    } catch (err) {
+      console.warn('Cloudflare D1 backend sync info:', err);
+    }
+
     setTimeout(() => {
       setIsVerifying(false);
-      onVerified(fullName, mobile);
+      onVerified(fullName.trim(), mobile.trim());
       onClose();
-    }, 600);
+    }, 500);
   };
 
   return (
@@ -94,7 +135,7 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1 block">Mobile Number (WhatsApp)</label>
+              <label className="text-xs font-semibold text-slate-300 mb-1 block">WhatsApp Mobile Number</label>
               <div className="relative">
                 <Phone className="w-4 h-4 absolute left-3.5 top-3 text-slate-500" />
                 <input
@@ -112,19 +153,55 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
               type="submit"
               className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition"
             >
-              <span>Send WhatsApp OTP</span>
+              <span>Generate WhatsApp Code</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-center text-xs space-y-1">
-              <p className="text-slate-400">Code sent to <span className="text-white font-mono font-bold">{mobile}</span> via WhatsApp</p>
-              <p className="text-[11px] text-emerald-400 font-mono">Default OTP: 123456</p>
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Mobile:</span>
+                <span className="text-white font-mono font-bold">{mobile}</span>
+              </div>
+
+              <div className="p-3 bg-emerald-950/50 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">Your Verification Code</span>
+                  <span className="text-2xl font-black text-emerald-400 font-mono tracking-widest">{generatedOtp}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-xs font-bold flex items-center gap-1 transition"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'Copied!' : 'Copy'}</span>
+                </button>
+              </div>
+
+              {/* Action: Open WhatsApp App */}
+              <button
+                type="button"
+                onClick={handleOpenWhatsApp}
+                className="w-full py-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition"
+              >
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <span>Open WhatsApp to Send Code</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOtpCode(generatedOtp)}
+                className="w-full text-center text-[11px] text-emerald-400 underline hover:text-emerald-300 font-medium"
+              >
+                Auto-fill Code ({generatedOtp})
+              </button>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1 block">Enter 6-Digit WhatsApp Code</label>
+              <label className="text-xs font-semibold text-slate-300 mb-1 block">Enter 6-Digit Verification Code</label>
               <input
                 type="text"
                 maxLength={6}
@@ -142,7 +219,7 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
               className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{isVerifying ? 'Verifying...' : 'Verify & Continue'}</span>
+              <span>{isVerifying ? 'Verifying & Saving...' : 'Verify & Complete'}</span>
             </button>
 
             <button
@@ -158,3 +235,4 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
     </div>
   );
 };
+

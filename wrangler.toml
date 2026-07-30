@@ -1,0 +1,12 @@
+name = "apnicar-backend"
+main = "cloudflare/worker.ts"
+compatibility_date = "2026-07-30"
+
+# Cloudflare D1 Database Binding
+[[d1_databases]]
+binding = "DB" # D1 binding name accessible as env.DB inside Cloudflare Workers
+database_name = "apnicar-d1"
+database_id = "your-d1-database-id-here" # Replace with your Cloudflare D1 Database ID from Wrangler dashboard
+
+[vars]
+ENVIRONMENT = "production"
