@@ -6,6 +6,7 @@ import { DriverDashboard } from './components/DriverDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { DriverRegistrationModal } from './components/DriverRegistrationModal';
+import { AuthVerificationModal } from './components/AuthVerificationModal';
 import { RideHistory } from './components/RideHistory';
 import { NotificationDrawer } from './components/NotificationDrawer';
 import { 
@@ -63,7 +64,87 @@ export default function App() {
   // Modals & Drawers
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [isRegisterDriverModalOpen, setIsRegisterDriverModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+
+  const handleAuthSuccess = (userData: {
+    name: string;
+    mobile: string;
+    email: string;
+    role: UserRole;
+    verifiedMethod: 'whatsapp' | 'google';
+    photoUrl?: string;
+  }) => {
+    setCurrentRole(userData.role);
+    
+    if (userData.role === 'rider') {
+      const newRider: Rider = {
+        id: `r_${Date.now()}`,
+        fullName: userData.name,
+        mobile: userData.mobile,
+        email: userData.email,
+        city: 'Lahore',
+        createdAt: new Date().toISOString()
+      };
+      setRiders([newRider, ...riders]);
+      setCurrentRiderIndex(0);
+    } else {
+      const newDriver: Driver = {
+        id: `d_${Date.now()}`,
+        fullName: userData.name,
+        mobile: userData.mobile,
+        email: userData.email,
+        cnic: '35202-0000000-1',
+        licenceNumber: 'LHR-2026-1001',
+        vehicle: {
+          id: `v_${Date.now()}`,
+          driverId: `d_${Date.now()}`,
+          type: 'mini',
+          brand: 'Suzuki',
+          model: 'Alto VXR',
+          color: 'White',
+          regNumber: 'LEA-26-1010'
+        },
+        photoUrl: userData.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        status: 'approved',
+        isOnline: true,
+        lat: 31.5204,
+        lng: 74.3587,
+        city: 'Lahore',
+        rating: 5.0,
+        totalTrips: 0,
+        totalEarnings: 0,
+        createdAt: new Date().toISOString(),
+        currentSubscription: {
+          id: `sub_${Date.now()}`,
+          driverId: `d_${Date.now()}`,
+          planType: 'daily',
+          amountPKR: 30,
+          purchaseDate: new Date().toISOString(),
+          expiryDate: new Date(Date.now() + 86400000).toISOString(),
+          paymentStatus: 'paid',
+          transactionId: 'TXN-FREE-VERIFIED',
+          paymentGateway: 'JazzCash',
+          status: 'active'
+        }
+      };
+      setDrivers([newDriver, ...drivers]);
+      setCurrentDriverIndex(0);
+    }
+
+    // Add welcome notification
+    const note: Notification = {
+      id: `n_${Date.now()}`,
+      userId: `u_${Date.now()}`,
+      role: userData.role,
+      title: '🎉 Welcome to Apni Car!',
+      message: `Account verified via ${userData.verifiedMethod.toUpperCase()} (${userData.mobile || userData.email}). Enjoy 0% commission rides!`,
+      isRead: false,
+      type: 'success',
+      createdAt: new Date().toISOString()
+    };
+    setNotifications([note, ...notifications]);
+  };
 
   // Active Ride Request currently being tracked
   const activeTrip = trips.length > 0 ? trips[0] : null;
@@ -332,6 +413,7 @@ export default function App() {
         onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
         onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
         onOpenRegisterDriverModal={() => setIsRegisterDriverModalOpen(true)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
         darkMode={darkMode}
         setDarkMode={setDarkMode}
         onQuickRoleSwitch={handleQuickRoleSwitch}
@@ -418,6 +500,12 @@ export default function App() {
         isOpen={isRegisterDriverModalOpen}
         onClose={() => setIsRegisterDriverModalOpen(false)}
         onSubmitDriver={handleSubmitNewDriver}
+      />
+
+      <AuthVerificationModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
       />
 
       <NotificationDrawer

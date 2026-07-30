@@ -10,7 +10,9 @@ import {
   PlusCircle, 
   LogOut,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  MessageSquare,
+  Sparkles
 } from 'lucide-react';
 import { UserRole, Driver, Rider } from '../types';
 
@@ -25,6 +27,7 @@ interface NavbarProps {
   onOpenNotifications: () => void;
   onOpenSubscriptionModal: () => void;
   onOpenRegisterDriverModal: () => void;
+  onOpenAuthModal: () => void;
   darkMode: boolean;
   setDarkMode: (val: boolean) => void;
   onQuickRoleSwitch: (role: UserRole, driverIndex?: number) => void;
@@ -40,6 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotifications,
   onOpenSubscriptionModal,
   onOpenRegisterDriverModal,
+  onOpenAuthModal,
   darkMode,
   setDarkMode,
   onQuickRoleSwitch
@@ -169,6 +173,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Action Icons & User Info */}
         <div className="flex items-center gap-2">
+          {/* Free Verification / Google Sign-In Button */}
+          <button
+            onClick={onOpenAuthModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 transition shadow-sm"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">WhatsApp / Google</span> Signup
+          </button>
+
           {/* Become a Driver Button for Riders */}
           {currentRole === 'rider' && (
             <button
