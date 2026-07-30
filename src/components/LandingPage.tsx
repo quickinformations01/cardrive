@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Car, UserCheck, ShieldCheck, Phone, ArrowRight, Sparkles } from 'lucide-react';
+import React from 'react';
+import { Car, UserCheck, ShieldCheck, Phone, ArrowRight, LogIn } from 'lucide-react';
 
 interface LandingPageProps {
   onContinueAsPassenger: () => void;
   onBecomeDriver: () => void;
   onOpenWhatsAppAuth: (role: 'rider' | 'driver') => void;
+  onOpenLogin: () => void;
   onAdminLogin?: () => void;
 }
 
@@ -12,6 +13,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onContinueAsPassenger,
   onBecomeDriver,
   onOpenWhatsAppAuth,
+  onOpenLogin,
   onAdminLogin
 }) => {
   return (
@@ -37,8 +39,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* Primary Choice Buttons */}
         <div className="space-y-3 pt-2">
           <button
+            type="button"
             onClick={onContinueAsPassenger}
-            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:brightness-110 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/20 flex items-center justify-between transition active:scale-98 group"
+            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:brightness-110 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/20 flex items-center justify-between transition active:scale-98 group cursor-pointer"
           >
             <span className="flex items-center gap-2.5">
               <UserCheck className="w-5 h-5" />
@@ -48,8 +51,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={onBecomeDriver}
-            className="w-full py-4 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-white font-bold text-sm tracking-wide shadow-md flex items-center justify-between transition active:scale-98 group"
+            className="w-full py-4 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-white font-bold text-sm tracking-wide shadow-md flex items-center justify-between transition active:scale-98 group cursor-pointer"
           >
             <span className="flex items-center gap-2.5">
               <span className="text-lg">🚖</span>
@@ -61,29 +65,41 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </button>
         </div>
 
-        {/* Divider */}
+        {/* Divider & Login Option */}
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-slate-800" />
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-slate-900 px-3 text-slate-500 font-medium">Already have an account?</span>
+            <span className="bg-slate-900 px-3 text-slate-400 font-medium">Already have an account?</span>
           </div>
         </div>
 
-        {/* Quick Login Options */}
-        <div className="space-y-2.5">
+        {/* Main Login Button */}
+        <button
+          type="button"
+          onClick={onOpenLogin}
+          className="w-full py-3.5 px-4 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-md"
+        >
+          <LogIn className="w-4 h-4 text-emerald-400" />
+          <span>Login to Existing Account</span>
+        </button>
+
+        {/* Quick Auth Options */}
+        <div className="space-y-2 pt-1">
           <button
+            type="button"
             onClick={() => onOpenWhatsAppAuth('rider')}
-            className="w-full py-3 px-4 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/30 text-emerald-300 font-semibold text-xs flex items-center justify-center gap-2 transition"
+            className="w-full py-3 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
           >
             <Phone className="w-4 h-4 text-emerald-400" />
-            <span>Continue with WhatsApp Verification</span>
+            <span>Verify with WhatsApp</span>
           </button>
 
           <button
+            type="button"
             onClick={() => onOpenWhatsAppAuth('rider')}
-            className="w-full py-3 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 transition"
+            className="w-full py-3 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -107,7 +123,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </button>
         </div>
 
-        {/* Footer info & Admin Login */}
+        {/* Footer info & Admin Portal */}
         <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-800/80">
           <span className="flex items-center gap-1 text-slate-400">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
@@ -115,8 +131,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </span>
           {onAdminLogin && (
             <button
+              type="button"
               onClick={onAdminLogin}
-              className="text-slate-400 hover:text-white font-mono hover:underline"
+              className="text-slate-400 hover:text-white font-mono hover:underline cursor-pointer"
             >
               Admin Portal
             </button>

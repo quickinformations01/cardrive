@@ -7,6 +7,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { DriverRegistrationModal } from './components/DriverRegistrationModal';
 import { WhatsAppAuthModal } from './components/WhatsAppAuthModal';
+import { LoginModal } from './components/LoginModal';
 import { NotificationDrawer } from './components/NotificationDrawer';
 import { LandingPage } from './components/LandingPage';
 import { BottomNav } from './components/BottomNav';
@@ -33,8 +34,7 @@ import {
   INITIAL_NOTIFICATIONS,
   DEFAULT_GUEST_RIDER,
   DEFAULT_GUEST_DRIVER,
-  DEFAULT_FARE_RATES,
-  calculateDetailedFare
+  DEFAULT_FARE_RATES
 } from './services/store';
 
 export default function App() {
@@ -78,37 +78,43 @@ export default function App() {
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [isRegisterDriverModalOpen, setIsRegisterDriverModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
 
-  // Landing Page Handlers
-  const handleLandingSelectRole = (role: 'rider' | 'driver') => {
-    setCurrentRole(role);
-    if (role === 'driver') {
-      setIsRegisterDriverModalOpen(true);
-    } else {
-      setShowLandingPage(false);
-    }
-  };
+  // Fetch initial drivers and riders from cloud backend if available
+  useEffect(() => {
+    fetch('/api/drivers')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setDrivers(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
-  const handleLandingWhatsAppClick = (role: 'rider' | 'driver') => {
-    setCurrentRole(role);
-    setIsWhatsAppModalOpen(true);
-  };
-
+  // WhatsApp OTP Verification Handler
   const handleWhatsAppVerified = (fullName: string, mobile: string) => {
     setShowLandingPage(false);
     
     if (currentRole === 'rider') {
       const newRider: Rider = {
         id: `r_${Date.now()}`,
-        fullName,
+        fullName: fullName || 'Valued Passenger',
         mobile,
-        email: `${fullName.toLowerCase().replace(/\s+/g, '')}@apnicar.pk`,
+        email: `${fullName.toLowerCase().replace(/\s+/g, '') || 'rider'}@apnicar.pk`,
         city: 'Lahore',
         createdAt: new Date().toISOString()
       };
       setRiders([newRider, ...riders]);
       setCurrentRiderIndex(0);
+
+      // Register Rider to backend
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, fullName, role: 'rider' })
+      }).catch(() => {});
     } else {
       setIsRegisterDriverModalOpen(true);
     }
@@ -127,7 +133,43 @@ export default function App() {
     setNotifications([note, ...notifications]);
   };
 
-  // Active Ride Request currently being tracked
+  // Login Success Handler for existing accounts
+  const handleLoginSuccess = (role: UserRole, mobile: string, userObj?: any) => {
+    setShowLandingPage(false);
+    setCurrentRole(role);
+
+    if (role === 'driver') {
+      const idx = drivers.findIndex(d => d.mobile === mobile);
+      if (idx >= 0) {
+        setCurrentDriverIndex(idx);
+      } else if (userObj) {
+        setDrivers(prev => [userObj, ...prev]);
+        setCurrentDriverIndex(0);
+      }
+    } else if (role === 'rider') {
+      const idx = riders.findIndex(r => r.mobile === mobile);
+      if (idx >= 0) {
+        setCurrentRiderIndex(idx);
+      } else if (userObj) {
+        setRiders(prev => [userObj, ...prev]);
+        setCurrentRiderIndex(0);
+      }
+    }
+
+    const note: Notification = {
+      id: `n_${Date.now()}`,
+      userId: `u_${Date.now()}`,
+      role,
+      title: '🔐 Logged In Successfully',
+      message: `Welcome back to ApniCar! You are logged in as ${role.toUpperCase()}.`,
+      isRead: false,
+      type: 'success',
+      createdAt: new Date().toISOString()
+    };
+    setNotifications([note, ...notifications]);
+  };
+
+  // Active Ride Request
   const activeTrip = trips.length > 0 ? trips[0] : null;
 
   // Toggle Dark Mode
@@ -176,7 +218,7 @@ export default function App() {
 
     setTrips([newTrip, ...trips]);
 
-    // Dispatch notification to online drivers
+    // Dispatch notification to drivers
     const newNote: Notification = {
       id: `n_${Date.now()}`,
       userId: currentDriver.id,
@@ -205,6 +247,13 @@ export default function App() {
 
     const updated = drivers.map((d, i) => i === currentDriverIndex ? { ...d, isOnline } : d);
     setDrivers(updated);
+
+    // Call Cloud Backend toggle online
+    fetch(`/api/drivers/${currentDriver.id}/toggle-online`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isOnline })
+    }).catch(() => {});
   };
 
   // Driver Accepts Ride
@@ -302,12 +351,29 @@ export default function App() {
       currentSubscription: newSub
     } : d);
     setDrivers(updated);
+
+    fetch('/api/subscriptions/purchase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        driverId: currentDriver.id,
+        planType,
+        gateway,
+        transactionId
+      })
+    }).catch(() => {});
   };
 
   // Admin Approve / Reject Driver
   const handleAdminUpdateDriverStatus = (driverId: string, status: DriverStatus, note?: string) => {
     const updated = drivers.map(d => d.id === driverId ? { ...d, status, isOnline: status === 'approved' ? d.isOnline : false } : d);
     setDrivers(updated);
+
+    fetch(`/api/drivers/${driverId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, note })
+    }).catch(() => {});
 
     const newNote: Notification = {
       id: `n_${Date.now()}`,
@@ -322,12 +388,38 @@ export default function App() {
     setNotifications([newNote, ...notifications]);
   };
 
-  // Submit new driver registration
-  const handleSubmitNewDriver = (newDriver: Driver) => {
+  // Submit new driver registration & persist to cloud backend
+  const handleSubmitNewDriver = async (newDriver: Driver) => {
     setDrivers([newDriver, ...drivers]);
     setShowLandingPage(false);
     setCurrentRole('driver');
     setCurrentDriverIndex(0);
+
+    try {
+      await fetch('/api/auth/register-driver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: newDriver.fullName,
+          mobile: newDriver.mobile,
+          email: newDriver.email,
+          cnic: newDriver.cnic,
+          licenceNumber: newDriver.licenceNumber,
+          vehicleType: newDriver.vehicle.type,
+          vehicleBrand: newDriver.vehicle.brand,
+          vehicleModel: newDriver.vehicle.model,
+          vehicleColor: newDriver.vehicle.color,
+          regNumber: newDriver.vehicle.regNumber,
+          photoUrl: newDriver.photoUrl,
+          cnicImage: newDriver.cnicFrontUrl,
+          licenceImage: newDriver.licenceImage,
+          vehicleImage: newDriver.vehicleFrontUrl,
+          city: newDriver.city
+        })
+      });
+    } catch (e) {
+      console.error("Cloud registration error:", e);
+    }
   };
 
   // Compute Admin Stats
@@ -345,13 +437,26 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-16">
-      {/* If initial state, render clean Landing Page */}
+      {/* Landing Page */}
       {showLandingPage ? (
         <LandingPage
-          onSelectPassenger={() => handleLandingSelectRole('rider')}
-          onSelectDriver={() => handleLandingSelectRole('driver')}
-          onWhatsAppClick={handleLandingWhatsAppClick}
-          onGoogleClick={handleLandingWhatsAppClick}
+          onContinueAsPassenger={() => {
+            setCurrentRole('rider');
+            setIsWhatsAppModalOpen(true);
+          }}
+          onBecomeDriver={() => {
+            setCurrentRole('driver');
+            setIsRegisterDriverModalOpen(true);
+          }}
+          onOpenWhatsAppAuth={(role) => {
+            setCurrentRole(role);
+            setIsWhatsAppModalOpen(true);
+          }}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
+          onAdminLogin={() => {
+            setCurrentRole('admin');
+            setShowLandingPage(false);
+          }}
         />
       ) : (
         <>
@@ -463,6 +568,12 @@ export default function App() {
         onClose={() => setIsWhatsAppModalOpen(false)}
         role={currentRole === 'driver' ? 'driver' : 'rider'}
         onVerified={handleWhatsAppVerified}
+      />
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
       />
 
       <NotificationDrawer
