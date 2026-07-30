@@ -41,6 +41,56 @@ export const INITIAL_RIDERS: Rider[] = [];
 // Initial mock drivers (Clean / Empty for live production usage)
 export const INITIAL_DRIVERS: Driver[] = [];
 
+// Safe default fallback objects when no users exist yet
+export const DEFAULT_GUEST_RIDER: Rider = {
+  id: 'guest_rider',
+  fullName: 'Guest Passenger',
+  mobile: '03000000000',
+  email: 'passenger@apnicar.pk',
+  city: 'Lahore',
+  createdAt: new Date().toISOString()
+};
+
+export const DEFAULT_GUEST_DRIVER: Driver = {
+  id: 'guest_driver',
+  fullName: 'Apni Car Driver',
+  mobile: '03000000000',
+  email: 'driver@apnicar.pk',
+  cnic: '35202-0000000-1',
+  licenceNumber: 'LHR-2026-0000',
+  vehicle: {
+    id: 'v_guest',
+    driverId: 'guest_driver',
+    type: 'mini',
+    brand: 'Suzuki',
+    model: 'Alto VXR',
+    color: 'White',
+    regNumber: 'LEA-26-0000'
+  },
+  photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  status: 'approved',
+  isOnline: true,
+  lat: 31.5204,
+  lng: 74.3587,
+  city: 'Lahore',
+  rating: 5.0,
+  totalTrips: 0,
+  totalEarnings: 0,
+  createdAt: new Date().toISOString(),
+  currentSubscription: {
+    id: 'sub_guest',
+    driverId: 'guest_driver',
+    planType: 'daily',
+    amountPKR: 30,
+    purchaseDate: new Date().toISOString(),
+    expiryDate: new Date(Date.now() + 86400000).toISOString(),
+    paymentStatus: 'paid',
+    transactionId: 'TXN-ACTIVE',
+    paymentGateway: 'JazzCash',
+    status: 'active'
+  }
+};
+
 // Initial mock subscriptions history
 export const INITIAL_SUBSCRIPTIONS: Subscription[] = [];
 

@@ -27,6 +27,8 @@ import {
   INITIAL_SUBSCRIPTIONS, 
   INITIAL_TRIPS, 
   INITIAL_NOTIFICATIONS,
+  DEFAULT_GUEST_RIDER,
+  DEFAULT_GUEST_DRIVER,
   calculateFare
 } from './services/store';
 
@@ -46,8 +48,8 @@ export default function App() {
   const [currentRiderIndex, setCurrentRiderIndex] = useState(0);
   const [currentDriverIndex, setCurrentDriverIndex] = useState(0);
 
-  const currentRider = riders[currentRiderIndex] || riders[0];
-  const currentDriver = drivers[currentDriverIndex] || drivers[0];
+  const currentRider = riders[currentRiderIndex] || riders[0] || DEFAULT_GUEST_RIDER;
+  const currentDriver = drivers[currentDriverIndex] || drivers[0] || DEFAULT_GUEST_DRIVER;
 
   // Map Locations
   const [pickupLocation, setPickupLocation] = useState({
@@ -162,8 +164,12 @@ export default function App() {
   // Handle Quick Role / Persona Switch
   const handleQuickRoleSwitch = (role: UserRole, driverIdx?: number) => {
     setCurrentRole(role);
-    if (role === 'driver' && driverIdx !== undefined) {
-      setCurrentDriverIndex(driverIdx);
+    if (role === 'driver') {
+      if (driverIdx !== undefined && driverIdx < drivers.length) {
+        setCurrentDriverIndex(driverIdx);
+      } else {
+        setCurrentDriverIndex(0);
+      }
     }
     if (role === 'admin') {
       setActiveTab('admin');

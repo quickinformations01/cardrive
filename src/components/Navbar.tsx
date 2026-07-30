@@ -69,24 +69,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             👤 Passenger Mode
           </button>
           <button 
-            onClick={() => onQuickRoleSwitch('driver', 0)}
+            onClick={() => onQuickRoleSwitch('driver')}
             className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-              currentRole === 'driver' && currentDriver?.status === 'approved'
+              currentRole === 'driver'
                 ? 'bg-emerald-500 text-slate-950 shadow-sm' 
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
             }`}
           >
-            🚖 Driver (Approved & Subscribed)
-          </button>
-          <button 
-            onClick={() => onQuickRoleSwitch('driver', 3)}
-            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-              currentRole === 'driver' && currentDriver?.status === 'pending'
-                ? 'bg-amber-500 text-slate-950 shadow-sm' 
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
-          >
-            ⏳ Pending Driver
+            🚖 Driver Mode
           </button>
           <button 
             onClick={() => onQuickRoleSwitch('admin')}
