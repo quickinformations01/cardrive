@@ -6,9 +6,10 @@ import { DriverDashboard } from './components/DriverDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { DriverRegistrationModal } from './components/DriverRegistrationModal';
-import { AuthVerificationModal } from './components/AuthVerificationModal';
-import { RideHistory } from './components/RideHistory';
+import { WhatsAppAuthModal } from './components/WhatsAppAuthModal';
 import { NotificationDrawer } from './components/NotificationDrawer';
+import { LandingPage } from './components/LandingPage';
+import { BottomNav } from './components/BottomNav';
 import { 
   UserRole, 
   Driver, 
@@ -19,7 +20,10 @@ import {
   AdminStats, 
   VehicleType, 
   SubscriptionPlanType,
-  DriverStatus
+  DriverStatus,
+  PassengerTab,
+  DriverTab,
+  FareRates
 } from './types';
 import { 
   INITIAL_DRIVERS, 
@@ -29,13 +33,18 @@ import {
   INITIAL_NOTIFICATIONS,
   DEFAULT_GUEST_RIDER,
   DEFAULT_GUEST_DRIVER,
-  calculateFare
+  DEFAULT_FARE_RATES,
+  calculateDetailedFare
 } from './services/store';
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
+  
+  // Landing Page & Role State
+  const [showLandingPage, setShowLandingPage] = useState(true);
   const [currentRole, setCurrentRole] = useState<UserRole>('rider');
-  const [activeTab, setActiveTab] = useState<'map' | 'history' | 'subscription' | 'admin' | 'register-driver'>('map');
+  const [passengerTab, setPassengerTab] = useState<PassengerTab>('home');
+  const [driverTab, setDriverTab] = useState<DriverTab>('home');
 
   // Application Data States
   const [drivers, setDrivers] = useState<Driver[]>(INITIAL_DRIVERS);
@@ -43,6 +52,7 @@ export default function App() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>(INITIAL_SUBSCRIPTIONS);
   const [trips, setTrips] = useState<TripRequest[]>(INITIAL_TRIPS);
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+  const [fareRates, setFareRates] = useState<FareRates>(DEFAULT_FARE_RATES);
 
   // Selected Active Users
   const [currentRiderIndex, setCurrentRiderIndex] = useState(0);
@@ -67,81 +77,49 @@ export default function App() {
   // Modals & Drawers
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [isRegisterDriverModalOpen, setIsRegisterDriverModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
 
-  const handleAuthSuccess = (userData: {
-    name: string;
-    mobile: string;
-    email: string;
-    role: UserRole;
-    verifiedMethod: 'whatsapp' | 'google';
-    photoUrl?: string;
-  }) => {
-    setCurrentRole(userData.role);
+  // Landing Page Handlers
+  const handleLandingSelectRole = (role: 'rider' | 'driver') => {
+    setCurrentRole(role);
+    if (role === 'driver') {
+      setIsRegisterDriverModalOpen(true);
+    } else {
+      setShowLandingPage(false);
+    }
+  };
+
+  const handleLandingWhatsAppClick = (role: 'rider' | 'driver') => {
+    setCurrentRole(role);
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleWhatsAppVerified = (fullName: string, mobile: string) => {
+    setShowLandingPage(false);
     
-    if (userData.role === 'rider') {
+    if (currentRole === 'rider') {
       const newRider: Rider = {
         id: `r_${Date.now()}`,
-        fullName: userData.name,
-        mobile: userData.mobile,
-        email: userData.email,
+        fullName,
+        mobile,
+        email: `${fullName.toLowerCase().replace(/\s+/g, '')}@apnicar.pk`,
         city: 'Lahore',
         createdAt: new Date().toISOString()
       };
       setRiders([newRider, ...riders]);
       setCurrentRiderIndex(0);
     } else {
-      const newDriver: Driver = {
-        id: `d_${Date.now()}`,
-        fullName: userData.name,
-        mobile: userData.mobile,
-        email: userData.email,
-        cnic: '35202-0000000-1',
-        licenceNumber: 'LHR-2026-1001',
-        vehicle: {
-          id: `v_${Date.now()}`,
-          driverId: `d_${Date.now()}`,
-          type: 'mini',
-          brand: 'Suzuki',
-          model: 'Alto VXR',
-          color: 'White',
-          regNumber: 'LEA-26-1010'
-        },
-        photoUrl: userData.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        status: 'approved',
-        isOnline: true,
-        lat: 31.5204,
-        lng: 74.3587,
-        city: 'Lahore',
-        rating: 5.0,
-        totalTrips: 0,
-        totalEarnings: 0,
-        createdAt: new Date().toISOString(),
-        currentSubscription: {
-          id: `sub_${Date.now()}`,
-          driverId: `d_${Date.now()}`,
-          planType: 'daily',
-          amountPKR: 30,
-          purchaseDate: new Date().toISOString(),
-          expiryDate: new Date(Date.now() + 86400000).toISOString(),
-          paymentStatus: 'paid',
-          transactionId: 'TXN-FREE-VERIFIED',
-          paymentGateway: 'JazzCash',
-          status: 'active'
-        }
-      };
-      setDrivers([newDriver, ...drivers]);
-      setCurrentDriverIndex(0);
+      setIsRegisterDriverModalOpen(true);
     }
 
-    // Add welcome notification
+    // Welcome Notification
     const note: Notification = {
       id: `n_${Date.now()}`,
       userId: `u_${Date.now()}`,
-      role: userData.role,
-      title: '🎉 Welcome to Apni Car!',
-      message: `Account verified via ${userData.verifiedMethod.toUpperCase()} (${userData.mobile || userData.email}). Enjoy 0% commission rides!`,
+      role: currentRole,
+      title: '🎉 Welcome to ApniCar!',
+      message: `WhatsApp number ${mobile} verified successfully. Enjoy 0% commission rides!`,
       isRead: false,
       type: 'success',
       createdAt: new Date().toISOString()
@@ -161,21 +139,10 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Handle Quick Role / Persona Switch
-  const handleQuickRoleSwitch = (role: UserRole, driverIdx?: number) => {
+  // Handle Quick Role Switch from Top Bar
+  const handleQuickRoleSwitch = (role: UserRole) => {
+    setShowLandingPage(false);
     setCurrentRole(role);
-    if (role === 'driver') {
-      if (driverIdx !== undefined && driverIdx < drivers.length) {
-        setCurrentDriverIndex(driverIdx);
-      } else {
-        setCurrentDriverIndex(0);
-      }
-    }
-    if (role === 'admin') {
-      setActiveTab('admin');
-    } else {
-      setActiveTab('map');
-    }
   };
 
   // Rider Requests Ride
@@ -184,9 +151,9 @@ export default function App() {
     pickupAddress: string;
     destAddress: string;
     distanceKm: number;
-    estimatedFarePKR?: number;
+    estimatedDurationMin: number;
+    estimatedFarePKR: number;
   }) => {
-    const calculatedFare = data.estimatedFarePKR || calculateFare(data.vehicleType, data.distanceKm, 350);
     const newTrip: TripRequest = {
       id: `trip_${Date.now()}`,
       riderId: currentRider.id,
@@ -199,7 +166,8 @@ export default function App() {
       destLat: dropoffLocation?.lat || 31.4822,
       destLng: dropoffLocation?.lng || 74.3642,
       distanceKm: data.distanceKm,
-      estimatedFarePKR: calculatedFare,
+      estimatedDurationMin: data.estimatedDurationMin || 15,
+      estimatedFarePKR: data.estimatedFarePKR,
       vehicleType: data.vehicleType,
       status: 'requested',
       paymentMethod: 'cash',
@@ -226,7 +194,7 @@ export default function App() {
   const handleToggleOnline = (isOnline: boolean) => {
     if (isOnline) {
       if (currentDriver.status !== 'approved') {
-        alert('Your driver registration is pending admin approval. You will receive a notification once approved!');
+        alert('Your driver registration is pending admin approval. Admin will verify your documents shortly!');
         return;
       }
       if (currentDriver.currentSubscription?.status !== 'active') {
@@ -287,7 +255,6 @@ export default function App() {
     setTrips(updatedTrips);
 
     if (status === 'completed') {
-      // Add 100% earnings to driver
       const currentTripObj = trips.find(t => t.id === tripId);
       if (currentTripObj) {
         setDrivers(drivers.map((d, i) => i === currentDriverIndex ? {
@@ -329,7 +296,6 @@ export default function App() {
 
     setSubscriptions([newSub, ...subscriptions]);
 
-    // Update driver subscription
     const updated = drivers.map((d, i) => i === currentDriverIndex ? {
       ...d,
       isOnline: true,
@@ -357,42 +323,11 @@ export default function App() {
   };
 
   // Submit new driver registration
-  const handleSubmitNewDriver = (data: any) => {
-    const newDriverObj: Driver = {
-      id: `d_${Date.now()}`,
-      fullName: data.fullName,
-      mobile: data.mobile,
-      email: data.email,
-      cnic: data.cnic,
-      licenceNumber: data.licenceNumber,
-      vehicle: {
-        id: `v_${Date.now()}`,
-        driverId: `d_${Date.now()}`,
-        type: data.vehicleType,
-        brand: data.vehicleBrand,
-        model: data.vehicleModel,
-        color: data.vehicleColor,
-        regNumber: data.regNumber
-      },
-      photoUrl: data.photoUrl,
-      cnicImage: data.cnicImage,
-      licenceImage: data.licenceImage,
-      vehicleImage: data.vehicleImage,
-      status: 'pending',
-      isOnline: false,
-      lat: 31.5204,
-      lng: 74.3587,
-      city: data.city,
-      rating: 5.0,
-      totalTrips: 0,
-      totalEarnings: 0,
-      createdAt: new Date().toISOString()
-    };
-
-    setDrivers([newDriverObj, ...drivers]);
+  const handleSubmitNewDriver = (newDriver: Driver) => {
+    setDrivers([newDriver, ...drivers]);
+    setShowLandingPage(false);
     setCurrentRole('driver');
-    setCurrentDriverIndex(drivers.length); // Select new driver
-    alert('Driver application submitted! Admin will verify your documents shortly.');
+    setCurrentDriverIndex(0);
   };
 
   // Compute Admin Stats
@@ -409,94 +344,105 @@ export default function App() {
   const onlineDriversCount = drivers.filter(d => d.isOnline && d.status === 'approved').length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Header Bar */}
-      <Navbar
-        currentRole={currentRole}
-        setCurrentRole={setCurrentRole}
-        currentDriver={currentDriver}
-        currentRider={currentRider}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        unreadNotificationsCount={notifications.filter(n => !n.isRead).length}
-        onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
-        onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
-        onOpenRegisterDriverModal={() => setIsRegisterDriverModalOpen(true)}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        onQuickRoleSwitch={handleQuickRoleSwitch}
-      />
-
-      {/* Main View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {activeTab === 'admin' ? (
-          <AdminDashboard
-            stats={adminStats}
-            drivers={drivers}
-            subscriptions={subscriptions}
-            onUpdateDriverStatus={handleAdminUpdateDriverStatus}
-          />
-        ) : activeTab === 'history' ? (
-          <RideHistory
-            trips={trips}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-16">
+      {/* If initial state, render clean Landing Page */}
+      {showLandingPage ? (
+        <LandingPage
+          onSelectPassenger={() => handleLandingSelectRole('rider')}
+          onSelectDriver={() => handleLandingSelectRole('driver')}
+          onWhatsAppClick={handleLandingWhatsAppClick}
+          onGoogleClick={handleLandingWhatsAppClick}
+        />
+      ) : (
+        <>
+          {/* Main Top Header Bar */}
+          <Navbar
             currentRole={currentRole}
-            currentUserId={currentRole === 'driver' ? currentDriver.id : currentRider.id}
+            setCurrentRole={setCurrentRole}
+            currentDriver={currentDriver}
+            currentRider={currentRider}
+            activeTab="map"
+            setActiveTab={() => {}}
+            unreadNotificationsCount={notifications.filter(n => !n.isRead).length}
+            onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
+            onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
+            onOpenRegisterDriverModal={() => setIsRegisterDriverModalOpen(true)}
+            onOpenAuthModal={() => setIsWhatsAppModalOpen(true)}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+            onQuickRoleSwitch={handleQuickRoleSwitch}
+            onLogout={() => setShowLandingPage(true)}
           />
-        ) : (
-          /* Main Interactive Map & Role Panel Split Grid */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Booking / Role-Based Control Panel (5 Cols - Order 1 on mobile) */}
-            <div className="lg:col-span-5 order-1 lg:order-1 space-y-6">
-              {currentRole === 'rider' ? (
-                <RiderDashboard
-                  pickup={pickupLocation}
-                  setPickup={setPickupLocation}
-                  dropoff={dropoffLocation}
-                  setDropoff={setDropoffLocation}
-                  onRequestRide={handleRequestRide}
-                  activeTrip={activeTrip}
-                  onCancelTrip={() => setTrips(trips.filter(t => t.id !== activeTrip?.id))}
-                  onRateDriver={(tripId, rating, comment) => {
-                    alert(`Thank you for rating ${rating} stars! Review saved.`);
-                  }}
-                  onlineDriversCount={onlineDriversCount}
-                  onOpenRegisterDriverModal={() => setIsRegisterDriverModalOpen(true)}
-                />
-              ) : (
-                <DriverDashboard
-                  driver={currentDriver}
-                  onToggleOnline={handleToggleOnline}
-                  onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
-                  activeTripRequest={activeTrip}
-                  onAcceptTrip={handleAcceptTrip}
-                  onUpdateTripStatus={handleUpdateTripStatus}
-                  pendingTripsCount={trips.filter(t => t.status === 'requested').length}
-                />
-              )}
-            </div>
 
-            {/* Interactive Map (7 Cols - Order 2 on mobile) */}
-            <div className="lg:col-span-7 order-2 lg:order-2 h-[380px] sm:h-[500px] lg:h-[680px] lg:sticky lg:top-20 z-0">
-              <InteractiveMap
-                pickupLocation={pickupLocation}
-                dropoffLocation={dropoffLocation}
+          {/* Main Content Area */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            {currentRole === 'admin' ? (
+              <AdminDashboard
+                stats={adminStats}
                 drivers={drivers}
-                onMapClick={(lat, lng) => {
-                  setDropoffLocation({ lat, lng, address: `Custom Pin (${lat.toFixed(3)}, ${lng.toFixed(3)})` });
-                }}
-                activeTripDriverLocation={activeTrip && activeTrip.status !== 'completed' ? { lat: currentDriver.lat, lng: currentDriver.lng } : null}
+                subscriptions={subscriptions}
+                onUpdateDriverStatus={handleAdminUpdateDriverStatus}
               />
-            </div>
-          </div>
-        )}
-      </main>
+            ) : (
+              /* Split Grid: Interactive Map + Role Dashboard */
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <div className="lg:col-span-5 order-1 lg:order-1 space-y-6">
+                  {currentRole === 'rider' ? (
+                    <RiderDashboard
+                      pickup={pickupLocation}
+                      setPickup={setPickupLocation}
+                      dropoff={dropoffLocation}
+                      setDropoff={setDropoffLocation}
+                      onRequestRide={handleRequestRide}
+                      activeTrip={activeTrip}
+                      onCancelTrip={() => setTrips(trips.filter(t => t.id !== activeTrip?.id))}
+                      onRateDriver={() => alert('Thank you for rating your driver!')}
+                      onlineDriversCount={onlineDriversCount}
+                      onOpenRegisterDriverModal={() => setIsRegisterDriverModalOpen(true)}
+                      currentRider={currentRider}
+                      passengerTab={passengerTab}
+                      fareRates={fareRates}
+                    />
+                  ) : (
+                    <DriverDashboard
+                      driver={currentDriver}
+                      onToggleOnline={handleToggleOnline}
+                      onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
+                      activeTripRequest={activeTrip}
+                      onAcceptTrip={handleAcceptTrip}
+                      onUpdateTripStatus={handleUpdateTripStatus}
+                      pendingTripsCount={trips.filter(t => t.status === 'requested').length}
+                      driverTab={driverTab}
+                    />
+                  )}
+                </div>
 
-      {/* Footer Info */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
-        <p>© 2026 Apni Car – Professional 0% Commission Ride-Hailing Platform in Pakistan.</p>
-        <p className="text-[10px] text-slate-600 mt-1">Built for high scale, fast performance, and fair driver earnings.</p>
-      </footer>
+                {/* Map View */}
+                <div className="lg:col-span-7 order-2 lg:order-2 h-[380px] sm:h-[480px] lg:h-[650px] lg:sticky lg:top-20 z-0">
+                  <InteractiveMap
+                    pickupLocation={pickupLocation}
+                    dropoffLocation={dropoffLocation}
+                    drivers={drivers}
+                    onMapClick={(lat, lng) => {
+                      setDropoffLocation({ lat, lng, address: `Destination (${lat.toFixed(3)}, ${lng.toFixed(3)})` });
+                    }}
+                    activeTripDriverLocation={activeTrip && activeTrip.status !== 'completed' ? { lat: currentDriver.lat, lng: currentDriver.lng } : null}
+                  />
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* Bottom App Navigation for Mobile */}
+          <BottomNav
+            role={currentRole}
+            passengerTab={passengerTab}
+            driverTab={driverTab}
+            onSelectPassengerTab={setPassengerTab}
+            onSelectDriverTab={setDriverTab}
+          />
+        </>
+      )}
 
       {/* Global Modals */}
       <SubscriptionModal
@@ -512,10 +458,11 @@ export default function App() {
         onSubmitDriver={handleSubmitNewDriver}
       />
 
-      <AuthVerificationModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={handleAuthSuccess}
+      <WhatsAppAuthModal
+        isOpen={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
+        role={currentRole === 'driver' ? 'driver' : 'rider'}
+        onVerified={handleWhatsAppVerified}
       />
 
       <NotificationDrawer

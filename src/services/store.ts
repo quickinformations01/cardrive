@@ -7,8 +7,17 @@ import {
   Review, 
   AdminStats, 
   SubscriptionPlan,
-  VehicleType
+  VehicleType,
+  FareRates
 } from '../types';
+
+export const DEFAULT_FARE_RATES: FareRates = {
+  bike: { baseFare: 70, perKm: 18, perMin: 2 },
+  rickshaw: { baseFare: 90, perKm: 22, perMin: 2.5 },
+  mini: { baseFare: 120, perKm: 30, perMin: 3 },
+  sedan: { baseFare: 250, perKm: 45, perMin: 5 },
+  suv: { baseFare: 350, perKm: 60, perMin: 7 }
+};
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
@@ -48,6 +57,7 @@ export const DEFAULT_GUEST_RIDER: Rider = {
   mobile: '03000000000',
   email: 'passenger@apnicar.pk',
   city: 'Lahore',
+  isVerified: true,
   createdAt: new Date().toISOString()
 };
 
@@ -101,72 +111,74 @@ export const INITIAL_NOTIFICATIONS: Notification[] = [];
 export interface FareBreakdown {
   distanceKm: number;
   distanceMiles: number;
-  fuelPricePKR: number;
-  kmPerLiter: number;
-  fuelLitersNeeded: number;
-  fuelCostPKR: number;
-  baseFeePKR: number;
-  maintenanceFeePKR: number;
+  durationMin: number;
+  baseFarePKR: number;
+  distanceFarePKR: number;
+  timeFarePKR: number;
+  tollPKR: number;
   totalFarePKR: number;
 }
 
-// Fuel-based calculation for fare estimation based on miles/km and current fuel price (e.g. PKR 350)
-export function calculateFuelBasedFare(
+// Calculate road distance between two points taking city road layout into account
+export function calculateRoadDistanceAndDuration(
+  lat1: number, 
+  lng1: number, 
+  lat2: number, 
+  lng2: number
+): { roadKm: number; roadMiles: number; durationMin: number } {
+  // Haversine formula for straight line distance
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLng = (lng2 - lng1) * (Math.PI / 180);
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const straightKm = R * c;
+
+  // Road factor multiplier (~1.35x for city turns and roads)
+  const roadKm = Math.max(1.2, parseFloat((straightKm * 1.35).toFixed(1)));
+  const roadMiles = parseFloat((roadKm * 0.621371).toFixed(1));
+  
+  // Average city traffic speed ~25 km/h -> 2.4 min per KM
+  const durationMin = Math.max(5, Math.ceil(roadKm * 2.4));
+
+  return { roadKm, roadMiles, durationMin };
+}
+
+// Fare calculation based on dynamic rates: Base + (Dist * PerKM) + (Time * PerMin) + Tolls
+export function calculateDetailedFare(
   vehicleType: VehicleType, 
   distanceKm: number, 
-  fuelPricePKR: number = 350
+  durationMin: number,
+  customRates?: FareRates
 ): FareBreakdown {
-  let kmPerLiter = 16;
-  let baseFee = 100;
-  let maintenancePerKm = 15;
+  const rates = customRates || DEFAULT_FARE_RATES;
+  const config = rates[vehicleType] || rates.mini;
 
-  switch (vehicleType) {
-    case 'bike':
-      kmPerLiter = 42;
-      baseFee = 35;
-      maintenancePerKm = 8;
-      break;
-    case 'rickshaw':
-      kmPerLiter = 22;
-      baseFee = 60;
-      maintenancePerKm = 12;
-      break;
-    case 'mini':
-      kmPerLiter = 16;
-      baseFee = 100;
-      maintenancePerKm = 18;
-      break;
-    case 'sedan':
-      kmPerLiter = 12;
-      baseFee = 150;
-      maintenancePerKm = 25;
-      break;
-    case 'suv':
-      kmPerLiter = 8;
-      baseFee = 220;
-      maintenancePerKm = 35;
-      break;
-  }
+  const baseFarePKR = config.baseFare;
+  const distanceFarePKR = Math.ceil(distanceKm * config.perKm);
+  const timeFarePKR = Math.ceil(durationMin * config.perMin);
+  const tollPKR = 0; // optional
 
-  const distanceMiles = parseFloat((distanceKm * 0.621371).toFixed(2));
-  const fuelLitersNeeded = distanceKm / kmPerLiter;
-  const fuelCostPKR = Math.ceil(fuelLitersNeeded * fuelPricePKR);
-  const maintenanceFeePKR = Math.ceil(distanceKm * maintenancePerKm);
-  const totalFarePKR = Math.max(Math.ceil(fuelCostPKR + baseFee + maintenanceFeePKR), baseFee + 30);
+  const totalFarePKR = Math.max(baseFarePKR + distanceFarePKR + timeFarePKR + tollPKR, baseFarePKR + 30);
+  const distanceMiles = parseFloat((distanceKm * 0.621371).toFixed(1));
 
   return {
-    distanceKm: parseFloat(distanceKm.toFixed(2)),
+    distanceKm: parseFloat(distanceKm.toFixed(1)),
     distanceMiles,
-    fuelPricePKR,
-    kmPerLiter,
-    fuelLitersNeeded: parseFloat(fuelLitersNeeded.toFixed(2)),
-    fuelCostPKR,
-    baseFeePKR: baseFee,
-    maintenanceFeePKR,
+    durationMin,
+    baseFarePKR,
+    distanceFarePKR,
+    timeFarePKR,
+    tollPKR,
     totalFarePKR
   };
 }
 
 export function calculateFare(vehicleType: VehicleType, distanceKm: number, fuelPricePKR: number = 350): number {
-  return calculateFuelBasedFare(vehicleType, distanceKm, fuelPricePKR).totalFarePKR;
+  const durationMin = Math.ceil(distanceKm * 2.4);
+  return calculateDetailedFare(vehicleType, distanceKm, durationMin).totalFarePKR;
 }
+

@@ -10,12 +10,12 @@ import {
   PhoneCall, 
   CheckCircle, 
   AlertTriangle, 
-  Clock, 
   ArrowRight,
   TrendingUp,
-  RefreshCw
+  User,
+  ListOrdered
 } from 'lucide-react';
-import { Driver, TripRequest } from '../types';
+import { Driver, TripRequest, DriverTab } from '../types';
 
 interface DriverDashboardProps {
   driver: Driver;
@@ -25,6 +25,7 @@ interface DriverDashboardProps {
   onAcceptTrip: (tripId: string) => void;
   onUpdateTripStatus: (tripId: string, status: 'arrived' | 'in_progress' | 'completed') => void;
   pendingTripsCount: number;
+  driverTab?: DriverTab;
 }
 
 export const DriverDashboard: React.FC<DriverDashboardProps> = ({
@@ -33,7 +34,8 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({
   onOpenSubscriptionModal,
   activeTripRequest,
   onAcceptTrip,
-  onUpdateTripStatus
+  onUpdateTripStatus,
+  driverTab = 'home'
 }) => {
   const isSubscribed = driver.currentSubscription?.status === 'active';
   const isApproved = driver.status === 'approved';
@@ -43,6 +45,103 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({
   if (driver.currentSubscription?.expiryDate) {
     const diff = new Date(driver.currentSubscription.expiryDate).getTime() - Date.now();
     daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  // Render Sub-Views based on Driver Bottom Tab
+  if (driverTab === 'trips') {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <ListOrdered className="w-5 h-5 text-emerald-400" />
+          Completed Trips
+        </h3>
+        {activeTripRequest ? (
+          <div className="p-4 bg-slate-800 rounded-2xl border border-slate-700 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-emerald-400 uppercase">{activeTripRequest.status}</span>
+              <span className="text-xs text-slate-400">{new Date(activeTripRequest.createdAt).toLocaleTimeString()}</span>
+            </div>
+            <p className="text-xs text-white">Pickup: {activeTripRequest.pickupAddress}</p>
+            <p className="text-xs text-white">Dropoff: {activeTripRequest.destAddress}</p>
+            <div className="flex justify-between items-center pt-2 border-t border-slate-700 font-bold text-xs">
+              <span className="text-slate-300">Cash Fare:</span>
+              <span className="text-emerald-400">PKR {activeTripRequest.estimatedFarePKR}</span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 py-6 text-center">No completed trips yet today.</p>
+        )}
+      </div>
+    );
+  }
+
+  if (driverTab === 'wallet') {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <Wallet className="w-5 h-5 text-emerald-400" />
+          Driver Wallet & Subscription
+        </h3>
+
+        <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700 space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-slate-400 font-semibold">Total Earnings</span>
+            <span className="text-xl font-black text-emerald-400">PKR {driver.totalEarnings}</span>
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-slate-700">
+            <span className="text-xs text-slate-400 font-semibold">Commission Deducted</span>
+            <span className="text-xs font-bold text-emerald-400">0% (Keep 100%)</span>
+          </div>
+        </div>
+
+        <div className="p-4 bg-emerald-950/60 border border-emerald-500/30 rounded-2xl space-y-3">
+          <div className="flex justify-between items-center">
+            <h4 className="text-sm font-bold text-white">Subscription Status</h4>
+            <span className="text-xs font-bold text-emerald-400">{isSubscribed ? 'Active Pass' : 'Expired'}</span>
+          </div>
+          <p className="text-xs text-slate-300">Days Remaining: {daysLeft} Days</p>
+          <button
+            onClick={onOpenSubscriptionModal}
+            className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 font-black text-slate-950 text-xs uppercase"
+          >
+            Renew Subscription Pass
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (driverTab === 'profile') {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <User className="w-5 h-5 text-emerald-400" />
+          Driver Profile & Vehicle
+        </h3>
+        <div className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 space-y-3 text-xs">
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block">Name</span>
+            <p className="text-sm font-bold text-white">{driver.fullName}</p>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block">Father Name</span>
+            <p className="text-sm font-bold text-slate-200">{driver.fatherName}</p>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block">CNIC</span>
+            <p className="text-sm font-mono text-slate-200">{driver.cnic}</p>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block">Vehicle</span>
+            <p className="text-sm font-bold text-emerald-400">{driver.vehicle.brand} {driver.vehicle.model} ({driver.vehicle.regNumber})</p>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block">Payout Method</span>
+            <p className="text-sm font-bold text-teal-400">{driver.payoutMethod || 'JazzCash'} ({driver.payoutAccountNumber})</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -159,7 +258,7 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({
 
       {/* Live Ride Request Radar Alert Modal / Active Dispatch Card */}
       {activeTripRequest && activeTripRequest.status === 'requested' && (
-        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border-2 border-emerald-400 rounded-2xl p-5 shadow-2xl space-y-4 animate-bounce-short">
+        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border-2 border-emerald-400 rounded-2xl p-5 shadow-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-emerald-800/60 pb-3">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
@@ -207,7 +306,7 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({
         </div>
       )}
 
-      {/* Active Ride Navigation Workflow (If Driver Accepted Ride) */}
+      {/* Active Ride Navigation Workflow */}
       {activeTripRequest && activeTripRequest.driverId === driver.id && activeTripRequest.status !== 'completed' && (
         <div className="bg-slate-900 border-2 border-emerald-500 rounded-2xl p-5 shadow-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">

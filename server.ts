@@ -132,9 +132,9 @@ async function startServer() {
         regNumber
       },
       photoUrl: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      cnicImage: cnicImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
+      cnicFrontUrl: cnicImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
       licenceImage: licenceImage || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&auto=format&fit=crop&q=80',
-      vehicleImage: vehicleImage || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=400&auto=format&fit=crop&q=80',
+      vehicleFrontUrl: vehicleImage || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=400&auto=format&fit=crop&q=80',
       status: 'pending', // Requires admin approval!
       isOnline: false,
       lat: 31.5204,
@@ -312,6 +312,7 @@ async function startServer() {
       destLat: Number(destLat),
       destLng: Number(destLng),
       distanceKm: Number(distanceKm) || 5,
+      estimatedDurationMin: Math.round((Number(distanceKm) || 5) * 2.4),
       estimatedFarePKR,
       vehicleType: vehicleType || 'mini',
       status: 'requested',

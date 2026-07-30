@@ -8,6 +8,9 @@ export type SubscriptionPlanType = 'daily' | 'weekly' | 'monthly';
 
 export type SubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'pending';
 
+export type PassengerTab = 'home' | 'history' | 'wallet' | 'profile';
+export type DriverTab = 'home' | 'trips' | 'wallet' | 'profile';
+
 export type TripStatus = 
   | 'requested' 
   | 'accepted' 
@@ -15,6 +18,59 @@ export type TripStatus =
   | 'in_progress' 
   | 'completed' 
   | 'cancelled';
+
+export interface VehicleRateConfig {
+  baseFare: number;
+  perKm: number;
+  perMin: number;
+}
+
+export interface FareRates {
+  bike: VehicleRateConfig;
+  rickshaw: VehicleRateConfig;
+  mini: VehicleRateConfig;
+  sedan: VehicleRateConfig;
+  suv: VehicleRateConfig;
+}
+
+export interface DriverRegistrationData {
+  // Step 1: Personal Info
+  fullName: string;
+  fatherName: string;
+  cnic: string;
+  dob: string;
+  gender: string;
+  // Step 2: Mobile & WhatsApp OTP
+  mobile: string;
+  whatsappCode: string;
+  isWhatsappVerified: boolean;
+  // Step 3 & 4: Vehicle Details
+  vehicleType: VehicleType;
+  company: string;
+  model: string;
+  year: string;
+  color: string;
+  regNumber: string;
+  city: string;
+  // Step 5: Documents (Base64 / Mock URLs)
+  cnicFrontUrl?: string;
+  cnicBackUrl?: string;
+  drivingLicenseUrl?: string;
+  registrationBookUrl?: string;
+  insuranceUrl?: string;
+  driverPhotoUrl?: string;
+  vehicleFrontUrl?: string;
+  vehicleBackUrl?: string;
+  vehicleLeftUrl?: string;
+  vehicleRightUrl?: string;
+  vehicleInteriorUrl?: string;
+  // Step 6: Bank Account / Mobile Wallet
+  payoutMethod: 'JazzCash' | 'EasyPaisa' | 'Bank Account';
+  payoutAccountName: string;
+  payoutAccountNumber: string;
+  // Step 7: Terms
+  acceptedTerms: boolean;
+}
 
 export interface Vehicle {
   id: string;
@@ -24,21 +80,35 @@ export interface Vehicle {
   model: string;
   color: string;
   regNumber: string;
+  year?: string;
   images?: string[];
 }
 
 export interface Driver {
   id: string;
   fullName: string;
+  fatherName?: string;
   mobile: string;
   email?: string;
   cnic: string;
+  dob?: string;
+  gender?: string;
   licenceNumber: string;
   vehicle: Vehicle;
   photoUrl?: string;
-  cnicImage?: string;
+  cnicFrontUrl?: string;
+  cnicBackUrl?: string;
   licenceImage?: string;
-  vehicleImage?: string;
+  registrationBookUrl?: string;
+  insuranceUrl?: string;
+  vehicleFrontUrl?: string;
+  vehicleBackUrl?: string;
+  vehicleLeftUrl?: string;
+  vehicleRightUrl?: string;
+  vehicleInteriorUrl?: string;
+  payoutMethod?: 'JazzCash' | 'EasyPaisa' | 'Bank Account';
+  payoutAccountName?: string;
+  payoutAccountNumber?: string;
   status: DriverStatus;
   isOnline: boolean;
   lat: number;
@@ -57,6 +127,8 @@ export interface Rider {
   mobile: string;
   email?: string;
   city: string;
+  isVerified?: boolean;
+  savedPlaces?: { id: string; title: string; address: string; lat: number; lng: number }[];
   createdAt: string;
 }
 
@@ -95,6 +167,7 @@ export interface TripRequest {
   destLat: number;
   destLng: number;
   distanceKm: number;
+  estimatedDurationMin: number;
   estimatedFarePKR: number;
   vehicleType: VehicleType;
   status: TripStatus;
@@ -153,3 +226,4 @@ export interface CityFare {
   baseFareSedan: number;
   perKmSedan: number;
 }
+

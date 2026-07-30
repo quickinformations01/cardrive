@@ -3,24 +3,22 @@ import {
   MapPin, 
   Navigation, 
   Car, 
-  Bike, 
-  ShieldCheck, 
   Banknote, 
   Star, 
-  Clock, 
   CheckCircle2, 
   PhoneCall, 
-  X,
   Zap,
   ArrowRight,
   Crosshair,
-  Fuel,
-  Calculator,
   UserPlus,
-  Compass
+  Clock,
+  Wallet,
+  User,
+  History,
+  ShieldCheck
 } from 'lucide-react';
-import { VehicleType, TripRequest, Driver } from '../types';
-import { calculateFuelBasedFare, FareBreakdown } from '../services/store';
+import { VehicleType, TripRequest, Rider, PassengerTab, FareRates } from '../types';
+import { calculateRoadDistanceAndDuration, calculateDetailedFare, DEFAULT_FARE_RATES } from '../services/store';
 
 interface RiderDashboardProps {
   pickup: { lat: number; lng: number; address: string };
@@ -32,6 +30,7 @@ interface RiderDashboardProps {
     pickupAddress: string;
     destAddress: string;
     distanceKm: number;
+    estimatedDurationMin: number;
     estimatedFarePKR: number;
   }) => void;
   activeTrip: TripRequest | null;
@@ -39,6 +38,9 @@ interface RiderDashboardProps {
   onRateDriver?: (tripId: string, rating: number, comment: string) => void;
   onlineDriversCount: number;
   onOpenRegisterDriverModal?: () => void;
+  currentRider: Rider;
+  passengerTab?: PassengerTab;
+  fareRates?: FareRates;
 }
 
 const PRESET_LOCATIONS = [
@@ -51,10 +53,10 @@ const PRESET_LOCATIONS = [
 ];
 
 const VEHICLE_OPTIONS: { type: VehicleType; label: string; desc: string; icon: string; time: string }[] = [
-  { type: 'bike', label: 'Apni Bike', desc: 'Fast & low cost for single riders (~42 km/L)', icon: '🏍️', time: '2 mins away' },
-  { type: 'rickshaw', label: 'Apni Auto', desc: 'Traditional Auto Rickshaw (~22 km/L)', icon: '🛺', time: '3 mins away' },
-  { type: 'mini', label: 'Apni Mini', desc: 'Hatchback Alto/Cultus/Vitz (~16 km/L)', icon: '🚗', time: '4 mins away' },
-  { type: 'sedan', label: 'Apni Comfort', desc: 'Premium Sedan Corolla/Civic (~12 km/L)', icon: '🚘', time: '5 mins away' }
+  { type: 'bike', label: 'Apni Bike', desc: 'Base Rs. 70 + Rs. 18/km', icon: '🏍️', time: '2 mins away' },
+  { type: 'rickshaw', label: 'Apni Auto', desc: 'Base Rs. 90 + Rs. 22/km', icon: '🛺', time: '3 mins away' },
+  { type: 'mini', label: 'Apni Mini', desc: 'Base Rs. 120 + Rs. 30/km', icon: '🚗', time: '4 mins away' },
+  { type: 'sedan', label: 'Apni Comfort', desc: 'Base Rs. 250 + Rs. 45/km', icon: '🚘', time: '5 mins away' }
 ];
 
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({
@@ -67,7 +69,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   onCancelTrip,
   onRateDriver,
   onlineDriversCount,
-  onOpenRegisterDriverModal
+  onOpenRegisterDriverModal,
+  currentRider,
+  passengerTab = 'home',
+  fareRates
 }) => {
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType>('mini');
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -78,17 +83,14 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   const [isLocating, setIsLocating] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
 
-  // Fuel Price configuration (Default PKR 350 / Liter as requested)
-  const [fuelPricePKR, setFuelPricePKR] = useState<number>(350);
-  const [manualDistanceKm, setManualDistanceKm] = useState<number>(6.5);
+  // Calculate Road Route Distance & Duration
+  const { roadKm, durationMin } = dropoff 
+    ? calculateRoadDistanceAndDuration(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng)
+    : { roadKm: 6.5, durationMin: 15 };
 
-  // Calculated distance in KM and Miles
-  const distanceKm = dropoff ? manualDistanceKm : 0;
-  const distanceMiles = parseFloat((distanceKm * 0.621371).toFixed(2));
-
-  // Fuel-based Fare Breakdown
-  const fareBreakdown: FareBreakdown | null = dropoff 
-    ? calculateFuelBasedFare(selectedVehicle, distanceKm, fuelPricePKR) 
+  // Calculate Fare using formula: Base + (Dist * PerKM) + (Time * PerMin)
+  const fareBreakdown = dropoff 
+    ? calculateDetailedFare(selectedVehicle, roadKm, durationMin, fareRates)
     : null;
 
   const estimatedFare = fareBreakdown ? fareBreakdown.totalFarePKR : 0;
@@ -109,13 +111,12 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         setPickup({
           lat: latitude,
           lng: longitude,
-          address: `Current GPS Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`
+          address: `GPS Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`
         });
         setIsLocating(false);
       },
-      (error) => {
+      () => {
         setIsLocating(false);
-        // Fallback to Lahore default
         setPickup({
           lat: 31.5204,
           lng: 74.3587,
@@ -134,7 +135,8 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
       vehicleType: selectedVehicle,
       pickupAddress: pickup.address,
       destAddress: dropoff.address,
-      distanceKm,
+      distanceKm: roadKm,
+      estimatedDurationMin: durationMin,
       estimatedFarePKR: estimatedFare
     });
   };
@@ -147,6 +149,78 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
       setReviewComment('');
     }
   };
+
+  // Render Sub-Views based on Passenger Bottom Tab
+  if (passengerTab === 'history') {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <History className="w-5 h-5 text-emerald-400" />
+          Ride History
+        </h3>
+        {activeTrip ? (
+          <div className="p-4 bg-slate-800 rounded-2xl border border-slate-700 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-emerald-400 uppercase">{activeTrip.vehicleType}</span>
+              <span className="text-xs text-slate-400">{new Date(activeTrip.createdAt).toLocaleTimeString()}</span>
+            </div>
+            <p className="text-xs text-white">Pickup: {activeTrip.pickupAddress}</p>
+            <p className="text-xs text-white">Dropoff: {activeTrip.destAddress}</p>
+            <div className="flex justify-between items-center pt-2 border-t border-slate-700 font-bold text-xs">
+              <span className="text-slate-300">Fare:</span>
+              <span className="text-emerald-400">PKR {activeTrip.estimatedFarePKR}</span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 py-6 text-center">No past rides recorded yet.</p>
+        )}
+      </div>
+    );
+  }
+
+  if (passengerTab === 'wallet') {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <Wallet className="w-5 h-5 text-emerald-400" />
+          Passenger Wallet
+        </h3>
+        <div className="p-5 bg-gradient-to-r from-emerald-900/60 to-teal-900/60 rounded-2xl border border-emerald-500/30 text-center space-y-2">
+          <p className="text-xs text-emerald-300 uppercase tracking-wider font-semibold">Payment Method</p>
+          <h4 className="text-2xl font-black text-white">Direct Cash Payment</h4>
+          <p className="text-xs text-slate-300">100% of the fare is paid in cash directly to your driver on ride completion.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (passengerTab === 'profile') {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <User className="w-5 h-5 text-emerald-400" />
+          Passenger Profile
+        </h3>
+        <div className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 space-y-3">
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block">Name</span>
+            <p className="text-sm font-bold text-white">{currentRider.fullName}</p>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block">Mobile Number</span>
+            <p className="text-sm font-mono text-emerald-400 font-bold">{currentRider.mobile}</p>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block">City</span>
+            <p className="text-sm font-bold text-slate-200">{currentRider.city || 'Lahore'}</p>
+          </div>
+          <div className="pt-2 border-t border-slate-700 flex items-center gap-2 text-xs text-emerald-400">
+            <ShieldCheck className="w-4 h-4" /> Verified Passenger Account
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -167,7 +241,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
             className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shrink-0 transition flex items-center gap-1.5"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Register as Driver</span>
+            <span>Become Driver</span>
           </button>
         </div>
       )}
@@ -194,7 +268,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
-                <MapPin className="w-4 h-4" /> Passenger Pickup Location
+                <MapPin className="w-4 h-4" /> Pickup Location
               </label>
               <button
                 type="button"
@@ -203,7 +277,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30 transition disabled:opacity-50"
               >
                 <Crosshair className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin' : ''}`} />
-                <span>{isLocating ? 'Locating...' : 'Get Current GPS Location'}</span>
+                <span>{isLocating ? 'Locating...' : 'Get GPS Location'}</span>
               </button>
             </div>
             <input
@@ -246,60 +320,12 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           </div>
         </div>
 
-        {/* Fuel Price & Distance Calculator Configurator */}
-        {dropoff && (
-          <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
-                <Fuel className="w-4 h-4" />
-                <span>Fuel Price Fare Calculator</span>
-              </div>
-              <span className="text-[10px] text-slate-400 font-mono">1 Mile = 1.61 KM</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <label className="text-slate-400 text-[11px] font-semibold block mb-1">
-                  Petrol Price (PKR/Liter)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-slate-500 font-bold">Rs.</span>
-                  <input
-                    type="number"
-                    value={fuelPricePKR}
-                    onChange={(e) => setFuelPricePKR(Math.max(100, Number(e.target.value)))}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-3 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-400 text-[11px] font-semibold block mb-1">
-                  Trip Distance (KM / Miles)
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={manualDistanceKm}
-                  onChange={(e) => setManualDistanceKm(Math.max(0.5, Number(e.target.value)))}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-[11px] text-slate-300 bg-slate-900 p-2 rounded-lg font-mono">
-              <span>Distance: <strong>{distanceKm} KM</strong> (~<strong>{distanceMiles} Miles</strong>)</span>
-              <span>Fuel Price: <strong>PKR {fuelPricePKR}/L</strong></span>
-            </div>
-          </div>
-        )}
-
         {/* Vehicle Selection Grid */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-slate-300">Select Vehicle Category</label>
           <div className="grid grid-cols-2 gap-2.5">
             {VEHICLE_OPTIONS.map((opt) => {
-              const breakdown = dropoff ? calculateFuelBasedFare(opt.type, distanceKm, fuelPricePKR) : null;
+              const breakdown = dropoff ? calculateDetailedFare(opt.type, roadKm, durationMin, fareRates) : null;
               return (
                 <button
                   key={opt.type}
@@ -325,9 +351,6 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                         <p className="text-sm font-black text-emerald-400">
                           PKR {breakdown.totalFarePKR}
                         </p>
-                        <p className="text-[9px] text-slate-400 font-mono">
-                          Fuel: PKR {breakdown.fuelCostPKR} ({breakdown.fuelLitersNeeded}L)
-                        </p>
                       </div>
                     )}
                   </div>
@@ -337,15 +360,15 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           </div>
         </div>
 
-        {/* Fare Summary & Detailed Transparent Formula */}
+        {/* Fare Summary & Formula */}
         {dropoff && fareBreakdown && (
           <div className="space-y-3 bg-slate-800/90 rounded-2xl p-4 border border-slate-700">
             <div className="flex items-center justify-between border-b border-slate-700 pb-2">
               <div>
-                <p className="text-[11px] text-slate-400 font-medium">Transparent Fare Breakdown</p>
+                <p className="text-[11px] text-slate-400 font-medium">Estimated Road Fare</p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-black text-emerald-400">PKR {estimatedFare}</span>
-                  <span className="text-xs text-slate-300 font-mono">({distanceMiles} Miles / {distanceKm} KM)</span>
+                  <span className="text-xs text-slate-300 font-mono">({roadKm} KM • ~{durationMin} mins)</span>
                 </div>
               </div>
               <button
@@ -353,27 +376,24 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 disabled={!!activeTrip && activeTrip.status !== 'completed'}
                 className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 font-black text-slate-950 shadow-lg shadow-emerald-950/50 flex items-center gap-2 transition disabled:opacity-50"
               >
-                <span>{activeTrip ? 'Trip in Progress' : 'Request Ride'}</span>
+                <span>{activeTrip ? 'Trip in Progress' : 'Book Ride'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Formula Detail Badges */}
+            {/* Formula Detail */}
             <div className="grid grid-cols-3 gap-2 text-[10px] font-mono text-center">
               <div className="p-2 rounded-lg bg-slate-900 border border-slate-700">
-                <span className="text-slate-400 block">Fuel Cost</span>
-                <span className="text-emerald-400 font-bold">PKR {fareBreakdown.fuelCostPKR}</span>
-                <span className="text-slate-500 text-[9px] block">({fareBreakdown.fuelLitersNeeded}L @ 350)</span>
+                <span className="text-slate-400 block">Base Fare</span>
+                <span className="text-emerald-400 font-bold">PKR {fareBreakdown.baseFarePKR}</span>
               </div>
               <div className="p-2 rounded-lg bg-slate-900 border border-slate-700">
-                <span className="text-slate-400 block">Driver Base</span>
-                <span className="text-amber-400 font-bold">PKR {fareBreakdown.baseFeePKR}</span>
-                <span className="text-slate-500 text-[9px] block">Fixed Fee</span>
+                <span className="text-slate-400 block">Distance ({roadKm}km)</span>
+                <span className="text-amber-400 font-bold">PKR {fareBreakdown.distanceFarePKR}</span>
               </div>
               <div className="p-2 rounded-lg bg-slate-900 border border-slate-700">
-                <span className="text-slate-400 block">Maintenance</span>
-                <span className="text-teal-400 font-bold">PKR {fareBreakdown.maintenanceFeePKR}</span>
-                <span className="text-slate-500 text-[9px] block">Wear & Tear</span>
+                <span className="text-slate-400 block">Time ({durationMin}m)</span>
+                <span className="text-teal-400 font-bold">PKR {fareBreakdown.timeFarePKR}</span>
               </div>
             </div>
 
@@ -387,7 +407,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
       {/* Active Trip Status Modal / Floating Drawer */}
       {activeTrip && (
-        <div className="bg-slate-900 border-2 border-emerald-500/80 rounded-2xl p-5 shadow-2xl relative overflow-hidden space-y-4 animate-in fade-in slide-in-from-bottom-5">
+        <div className="bg-slate-900 border-2 border-emerald-500/80 rounded-2xl p-5 shadow-2xl relative overflow-hidden space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
