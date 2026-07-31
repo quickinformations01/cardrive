@@ -1,6 +1,10 @@
 {
   "name": "Apni Car",
-  "description": "Professional Ride-Hailing & Driver Subscription Platform with live ride dispatch, driver subscription plans, document verification, and admin analytics.",
-  "requestFramePermissions": ["geolocation", "camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "description": "Production-ready PWA Ride-Hailing Platform with Zero Commission for Drivers and Seamless Rides for Passengers.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
